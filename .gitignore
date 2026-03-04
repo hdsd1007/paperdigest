@@ -1,0 +1,24 @@
+# Environment & secrets
+.env
+
+# Generated outputs (900MB+)
+outputs/
+
+# Vendor dependencies (cloned by setup.sh)
+vendor/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE
+.vscode/
+
+# Claude Code personal settings
+**/settings.local.json
+.claude/projects/
+
+# Generated artifacts
+backend/chart.png
+paper_notebook.ipynb

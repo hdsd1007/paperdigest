@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>PaperDigest</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Mono:wght@300;400;500&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #fafaf9;
+      --surface: #ffffff;
+      --surface2: #f5f5f4;
+      --border: #e7e5e4;
+      --accent: #4f46e5;
+      --accent-dim: rgba(79,70,229,0.06);
+      --accent-border: rgba(79,70,229,0.18);
+      --text: #1c1917;
+      --muted: #78716c;
+      --error: #dc2626;
+      --serif: 'Instrument Serif', Georgia, serif;
+      --sans: 'DM Sans', system-ui, sans-serif;
+      --mono: 'DM Mono', monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Subtle glow overlay ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(ellipse at 50% 0%, rgba(79,70,229,0.03) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Nav ── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 40px;
+      height: 60px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,0.85);
+      backdrop-filter: blur(12px);
+      z-index: 100;
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--mono);
+      font-size: 14px;
+    }
+
+    .logo-mark {
+      width: 28px; height: 28px;
+      background: var(--accent);
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px;
+      color: #fff;
+      font-weight: 700;
+    }
+
+    .nav-logo span { color: var(--muted); }
+    .nav-link {
+      font-size: 13px;
+      color: var(--muted);
+      text-decoration: none;
+      display: flex;
+      gap: 20px;
+    }
+
+    /* ── Hero ── */
+    .hero {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 120px 24px 60px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero-kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--accent-dim);
+      border: 1px solid var(--accent-border);
+      border-radius: 20px;
+      padding: 5px 16px;
+      font-size: 12px;
+      font-family: var(--mono);
+      color: var(--accent);
+      letter-spacing: 0.05em;
+      margin-bottom: 28px;
+    }
+
+    .hero-kicker::before {
+      content: '';
+      width: 6px; height: 6px;
+      background: var(--accent);
+      border-radius: 50%;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    h1 {
+      font-family: var(--serif);
+      font-size: clamp(42px, 7vw, 88px);
+      font-weight: 400;
+      text-align: center;
+      line-height: 1.05;
+      color: var(--text);
+      margin-bottom: 12px;
+      max-width: 800px;
+    }
+
+    h1 em {
+      font-style: italic;
+      color: var(--accent);
+    }
+
+    .hero-sub {
+      font-size: 17px;
+      color: var(--muted);
+      text-align: center;
+      max-width: 520px;
+      line-height: 1.6;
+      margin-bottom: 56px;
+    }
+
+    /* ── Upload card ── */
+    .upload-card {
+      width: 100%;
+      max-width: 620px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 40px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.03);
+    }
+
+    .upload-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      opacity: 0.4;
+    }
+
+    .drop-zone {
+      border: 1.5px dashed var(--border);
+      border-radius: 14px;
+      padding: 48px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: var(--surface2);
+      position: relative;
+    }
+
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: var(--accent);
+      background: var(--accent-dim);
+    }
+
+    .drop-icon {
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: center;
+      color: var(--muted);
+    }
+
+    .drop-zone:hover .drop-icon, .drop-zone.drag-over .drop-icon {
+      color: var(--accent);
+    }
+
+    .drop-title {
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+
+    .drop-hint {
+      font-size: 13px;
+      color: var(--muted);
+      font-family: var(--mono);
+    }
+
+    .drop-zone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    .file-selected {
+      margin-top: 16px;
+      display: none;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+
+    .file-selected.show { display: flex; }
+
+    .file-icon {
+      font-size: 24px;
+    }
+
+    .file-details { flex: 1; }
+    .file-name { font-size: 13px; font-weight: 500; color: var(--text); }
+    .file-size { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+
+    .file-remove {
+      background: none; border: none;
+      color: var(--muted); cursor: pointer;
+      font-size: 16px; padding: 4px;
+      transition: color 0.15s;
+    }
+    .file-remove:hover { color: var(--error); }
+
+    .generate-btn {
+      width: 100%;
+      margin-top: 20px;
+      padding: 16px;
+      background: var(--accent);
+      color: #ffffff;
+      border: none;
+      border-radius: 12px;
+      font-family: var(--sans);
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      letter-spacing: -0.01em;
+    }
+
+    .generate-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+    .generate-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    /* ── Features row ── */
+    .features {
+      display: flex;
+      gap: 12px;
+      margin-top: 32px;
+    }
+
+    .feature {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+    }
+
+    .feature-icon {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 8px;
+      color: var(--accent);
+    }
+    .feature-label { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+
+    /* ── Progress modal ── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.3);
+      backdrop-filter: blur(8px);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.show { display: flex; }
+
+    .modal {
+      width: 100%;
+      max-width: 560px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 40px;
+      margin: 24px;
+    }
+
+    .modal-title {
+      font-family: var(--serif);
+      font-size: 22px;
+      font-style: italic;
+      color: var(--text);
+      margin-bottom: 24px;
+    }
+
+    /* Pipeline visual */
+    .pipeline-viz {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      margin-bottom: 20px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 20px;
+      overflow-x: auto;
+    }
+
+    .pipe-node {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      flex-shrink: 0;
+      opacity: 0.35;
+      transition: all 0.4s;
+      position: relative;
+    }
+
+    .pipe-node.active {
+      opacity: 1;
+      transform: scale(1.08);
+    }
+
+    .pipe-node.done { opacity: 0.7; }
+
+    .pipe-node-icon {
+      width: 36px; height: 36px;
+      border-radius: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--muted);
+      transition: all 0.3s;
+    }
+
+    .pipe-node.active .pipe-node-icon {
+      border-color: var(--accent);
+      background: var(--accent-dim);
+      box-shadow: 0 0 12px rgba(79,70,229,0.2);
+      color: var(--accent);
+    }
+
+    .pipe-node.done .pipe-node-icon {
+      border-color: #86efac;
+      background: rgba(34,197,94,0.06);
+      color: #22c55e;
+    }
+
+    .pipe-node.done::after {
+      content: '\2713';
+      position: absolute;
+      top: -4px;
+      right: -2px;
+      width: 16px; height: 16px;
+      background: #22c55e;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      line-height: 1;
+    }
+
+    .pipe-label {
+      font-size: 9px;
+      font-family: var(--mono);
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      text-align: center;
+    }
+
+    .pipe-arrow {
+      color: var(--border);
+      font-size: 18px;
+      margin: 0 6px;
+      margin-bottom: 16px;
+      flex-shrink: 0;
+    }
+
+    /* Shimmer progress bar */
+    .shimmer-bar {
+      height: 2px;
+      background: var(--surface2);
+      border-radius: 1px;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+
+    .shimmer-bar::after {
+      content: '';
+      display: block;
+      height: 100%;
+      width: 40%;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      animation: shimmer 1.5s ease-in-out infinite;
+    }
+
+    @keyframes shimmer {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(350%); }
+    }
+
+    /* Status line */
+    .status-line {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .status-dot {
+      width: 8px; height: 8px;
+      background: var(--accent);
+      border-radius: 50%;
+      flex-shrink: 0;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    /* Timer & tips row */
+    .timer-tips {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 14px;
+      font-size: 12px;
+      font-family: var(--mono);
+      color: var(--muted);
+    }
+
+    .elapsed-time {
+      flex-shrink: 0;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 10px;
+      letter-spacing: 0.04em;
+    }
+
+    .tip-text {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      transition: opacity 0.4s ease;
+    }
+
+    .tip-text.fade { opacity: 0; }
+
+    /* ── Done state ── */
+    .modal-done {
+      display: none;
+      text-align: center;
+    }
+
+    .done-checkmark {
+      width: 64px; height: 64px;
+      background: var(--accent-dim);
+      border: 2px solid var(--accent);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--accent);
+      margin: 0 auto 20px;
+    }
+
+    .done-title {
+      font-family: var(--serif);
+      font-size: 26px;
+      font-style: italic;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+
+    .done-sub {
+      font-size: 14px;
+      color: var(--muted);
+      margin-bottom: 28px;
+    }
+
+    .open-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--accent);
+      color: #ffffff;
+      font-family: var(--sans);
+      font-size: 15px;
+      font-weight: 600;
+      padding: 14px 32px;
+      border-radius: 12px;
+      text-decoration: none;
+      transition: opacity 0.15s;
+    }
+
+    .open-btn:hover { opacity: 0.85; }
+
+    .close-modal {
+      display: block;
+      margin: 16px auto 0;
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 13px;
+      cursor: pointer;
+      font-family: var(--sans);
+      transition: color 0.15s;
+    }
+
+    .close-modal:hover { color: var(--text); }
+
+    /* ── Error state ── */
+    .modal-error {
+      display: none;
+      text-align: center;
+    }
+
+    .error-icon {
+      margin-bottom: 12px;
+      color: var(--error);
+      display: flex;
+      justify-content: center;
+    }
+
+    .error-message {
+      background: rgba(220,38,38,0.06);
+      border: 1px solid rgba(220,38,38,0.2);
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 13px;
+      font-family: var(--mono);
+      color: var(--error);
+      text-align: left;
+      word-break: break-word;
+      margin: 16px 0;
+    }
+
+    .retry-btn {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 14px;
+      padding: 10px 24px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .retry-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── Footer ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 24px 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--muted);
+      font-family: var(--mono);
+      z-index: 1;
+    }
+
+    footer a { color: var(--muted); }
+
+    @media (max-width: 600px) {
+      .features { flex-direction: column; }
+      .upload-card { padding: 24px; }
+      h1 { font-size: 40px; }
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="nav-logo">
+      <div class="logo-mark">PD</div>
+      Paper<span>Digest</span>
+    </div>
+    <div class="nav-link">
+      <a href="https://github.com/VizuaraAI/paper-to-notebook" target="_blank" style="color: var(--muted)">paper-to-notebook &#8599;</a>
+      <a href="https://github.com/llmsresearch/paperbanana" target="_blank" style="color: var(--muted)">paperbanana &#8599;</a>
+    </div>
+  </nav>
+
+  <main class="hero">
+    <div class="hero-kicker">Research papers, digested</div>
+    <h1>Understand any paper<br><em>instantly</em></h1>
+    <p class="hero-sub">Upload a research PDF. Get a structured digest with AI diagrams, a code summary, and a runnable Colab notebook.</p>
+
+    <div class="upload-card">
+      <div class="drop-zone" id="dropZone"
+           ondragover="handleDragOver(event)"
+           ondragleave="handleDragLeave(event)"
+           ondrop="handleDrop(event)">
+        <input type="file" id="fileInput" accept=".pdf" onchange="handleFileSelect(this)">
+        <span class="drop-icon">
+          <svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </span>
+        <div class="drop-title">Drop your PDF here</div>
+        <div class="drop-hint">or click to browse &middot; max 50 MB</div>
+      </div>
+
+      <div class="file-selected" id="fileSelected">
+        <span class="file-icon">
+          <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8m8 4H8"/></svg>
+        </span>
+        <div class="file-details">
+          <div class="file-name" id="fileName">&mdash;</div>
+          <div class="file-size" id="fileSize">&mdash;</div>
+        </div>
+        <button class="file-remove" onclick="removeFile()" title="Remove">&#10005;</button>
+      </div>
+
+      <button class="generate-btn" id="generateBtn" onclick="startGeneration()" disabled>
+        <span>Generate Digest</span>
+      </button>
+
+      <div class="features">
+        <div class="feature">
+          <div class="feature-icon">
+            <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z"/><path d="M19 15l.5 1.5L21 17l-1.5.5L19 19l-.5-1.5L17 17l1.5-.5z"/></svg>
+          </div>
+          <div class="feature-label">AI Summary</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">
+            <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+          </div>
+          <div class="feature-label">Paper + AI Figures</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">
+            <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l6-6-6-6"/><path d="M12 19h8"/></svg>
+          </div>
+          <div class="feature-label">Colab Notebook</div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ── Progress Modal ─────────────────────────────────────────────────── -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal">
+
+      <!-- Running state -->
+      <div id="runningState">
+        <div class="modal-title">Analysing your paper&#8230;</div>
+
+        <!-- Pipeline viz -->
+        <div class="pipeline-viz">
+          <div class="pipe-node" id="node-ocr">
+            <div class="pipe-node-icon">
+              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8m8 4H8"/></svg>
+            </div>
+            <div class="pipe-label">Parse<br>PDF</div>
+          </div>
+          <div class="pipe-arrow">&rarr;</div>
+          <div class="pipe-node" id="node-summarize">
+            <div class="pipe-node-icon">
+              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 114 4L7.5 20.5 2 22l1.5-5.5z"/></svg>
+            </div>
+            <div class="pipe-label">Write<br>Digest</div>
+          </div>
+          <div class="pipe-arrow">&rarr;</div>
+          <div class="pipe-node" id="node-diagrams">
+            <div class="pipe-node-icon">
+              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+            </div>
+            <div class="pipe-label">Draw<br>Diagrams</div>
+          </div>
+          <div class="pipe-arrow">&rarr;</div>
+          <div class="pipe-node" id="node-notebook">
+            <div class="pipe-node-icon">
+              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg>
+            </div>
+            <div class="pipe-label">Build<br>Notebook</div>
+          </div>
+          <div class="pipe-arrow">&rarr;</div>
+          <div class="pipe-node" id="node-orchestrate">
+            <div class="pipe-node-icon">
+              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+            </div>
+            <div class="pipe-label">Assemble<br>&amp; Polish</div>
+          </div>
+        </div>
+
+        <div class="shimmer-bar" id="shimmerBar"></div>
+
+        <div class="status-line">
+          <span class="status-dot"></span>
+          <span id="statusText">Starting pipeline&#8230;</span>
+        </div>
+
+        <div class="timer-tips">
+          <span class="elapsed-time" id="elapsedTime">0:00</span>
+          <span class="tip-text" id="tipText"></span>
+        </div>
+      </div>
+
+      <!-- Done state -->
+      <div class="modal-done" id="doneState">
+        <div class="done-checkmark">
+          <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <div class="done-title">Your digest is ready</div>
+        <div class="done-sub" id="donePaperTitle">Digest generated</div>
+        <a href="#" class="open-btn" id="openDigestLink" target="_blank">
+          Open Digest &rarr;
+        </a>
+        <button class="close-modal" onclick="closeModal()">Back to upload</button>
+      </div>
+
+      <!-- Error state -->
+      <div class="modal-error" id="errorState">
+        <div class="error-icon">
+          <svg width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </div>
+        <div style="font-size:20px; color:var(--text); margin-bottom:8px">Something went wrong</div>
+        <div class="error-message" id="errorMessage"></div>
+        <button class="retry-btn" onclick="closeModal()">Try Again</button>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <strong style="color:var(--text)">PaperDigest</strong>&nbsp;&middot;&nbsp;
+    <a href="https://github.com/llmsresearch/paperbanana" target="_blank">PaperBanana</a>&nbsp;&middot;&nbsp;
+    <a href="https://github.com/VizuaraAI/paper-to-notebook" target="_blank">paper-to-notebook</a>
+  </footer>
+
+  <script>
+    // ── State ─────────────────────────────────────────────────────────────────
+    let selectedFile = null;
+    let currentSessionId = null;
+
+    // Timer & tips state
+    let elapsedInterval = null;
+    let elapsedSeconds = 0;
+    let tipInterval = null;
+    let tipIndex = 0;
+    const TIPS = [
+      "Each diagram goes through multiple AI refinement iterations",
+      "The digest targets ~2,000 words for easy reading",
+      "Diagrams are placed inline right where concepts are explained",
+      "Code snippets are extracted from a full runnable notebook",
+      "The AI reads your entire paper before writing the digest",
+      "Key equations from the paper are preserved in LaTeX",
+      "Results charts use exact numbers from the paper",
+      "The notebook can be opened directly in Google Colab",
+      "Each section follows: motivation \u2192 intuition \u2192 detail",
+      "Illustrations use everyday analogies for instant understanding",
+    ];
+
+    const STEP_NODE_MAP = {
+      'ocr': 'ocr',
+      'profile': 'ocr',
+      'title': 'ocr',
+      'figures': 'ocr',
+      'tables': 'summarize',
+      'summarize': 'summarize',
+      'banana_plan': 'summarize',
+      'diagrams': 'diagrams',
+      'notebook': 'notebook',
+      'code_extract': 'notebook',
+      'refine': 'orchestrate',
+      'orchestrate': 'orchestrate',
+    };
+    let maxActiveIdx = -1;
+
+    // ── File handling ──────────────────────────────────────────────────────────
+    function handleFileSelect(input) {
+      setFile(input.files[0]);
+    }
+
+    function handleDragOver(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+      document.getElementById('dropZone').classList.add('drag-over');
+    }
+
+    function handleDragLeave(e) {
+      document.getElementById('dropZone').classList.remove('drag-over');
+    }
+
+    function handleDrop(e) {
+      e.preventDefault();
+      document.getElementById('dropZone').classList.remove('drag-over');
+      const file = e.dataTransfer.files[0];
+      if (file && file.name.endsWith('.pdf')) setFile(file);
+      else alert('Please drop a PDF file.');
+    }
+
+    function setFile(file) {
+      selectedFile = file;
+      document.getElementById('fileName').textContent = file.name;
+      document.getElementById('fileSize').textContent = formatBytes(file.size);
+      document.getElementById('fileSelected').classList.add('show');
+      document.getElementById('generateBtn').disabled = false;
+    }
+
+    function removeFile() {
+      selectedFile = null;
+      document.getElementById('fileSelected').classList.remove('show');
+      document.getElementById('generateBtn').disabled = true;
+      document.getElementById('fileInput').value = '';
+    }
+
+    function formatBytes(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / 1048576).toFixed(1) + ' MB';
+    }
+
+    // ── Generation ────────────────────────────────────────────────────────────
+    async function startGeneration() {
+      if (!selectedFile) return;
+
+      // Reset modal
+      resetModal();
+      document.getElementById('modalOverlay').classList.add('show');
+      document.getElementById('generateBtn').disabled = true;
+
+      // Upload PDF
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+
+      let sessionId;
+      try {
+        const res = await fetch('/process', { method: 'POST', body: formData });
+        if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
+        const data = await res.json();
+        sessionId = data.session_id;
+        currentSessionId = sessionId;
+      } catch (err) {
+        showError(err.message);
+        return;
+      }
+
+      // Stream progress
+      const evtSource = new EventSource(`/status/${sessionId}`);
+
+      evtSource.onmessage = function(e) {
+        const event = JSON.parse(e.data);
+        const { step, message } = event;
+
+        if (step === 'done') {
+          evtSource.close();
+          showDone(sessionId);
+          return;
+        }
+
+        if (step === 'error') {
+          evtSource.close();
+          showError(message);
+          return;
+        }
+
+        // Update status text
+        document.getElementById('statusText').textContent = message;
+
+        // Activate pipeline node (high-water-mark: nodes never go backward)
+        const nodeKey = STEP_NODE_MAP[step];
+        if (nodeKey) {
+          const nodes = ['ocr', 'summarize', 'diagrams', 'notebook', 'orchestrate'];
+          const idx = nodes.indexOf(nodeKey);
+          if (idx >= maxActiveIdx) {
+            maxActiveIdx = idx;
+            nodes.forEach((n, i) => {
+              const el = document.getElementById(`node-${n}`);
+              if (!el) return;
+              if (i < maxActiveIdx) { el.classList.remove('active'); el.classList.add('done'); }
+              else if (i === maxActiveIdx) { el.classList.add('active'); el.classList.remove('done'); }
+              else { el.classList.remove('active', 'done'); }
+            });
+          }
+        }
+      };
+
+      evtSource.onerror = function() {
+        evtSource.close();
+        checkFinalStatus(sessionId);
+      };
+    }
+
+    async function checkFinalStatus(sessionId) {
+      try {
+        const res = await fetch(`/session/${sessionId}/info`);
+        const data = await res.json();
+        if (data.status === 'done') showDone(sessionId);
+        else if (data.status === 'error') showError(data.error || 'Unknown error');
+        else setTimeout(() => checkFinalStatus(sessionId), 2000);
+      } catch {
+        showError('Connection lost. Please refresh and try again.');
+      }
+    }
+
+    // ── Modal states ──────────────────────────────────────────────────────────
+    function startTimer() {
+      elapsedSeconds = 0;
+      document.getElementById('elapsedTime').textContent = '0:00';
+      elapsedInterval = setInterval(() => {
+        elapsedSeconds++;
+        const m = Math.floor(elapsedSeconds / 60);
+        const s = String(elapsedSeconds % 60).padStart(2, '0');
+        document.getElementById('elapsedTime').textContent = m + ':' + s;
+      }, 1000);
+    }
+
+    function stopTimer() {
+      if (elapsedInterval) { clearInterval(elapsedInterval); elapsedInterval = null; }
+    }
+
+    function startTips() {
+      tipIndex = Math.floor(Math.random() * TIPS.length);
+      const el = document.getElementById('tipText');
+      el.textContent = TIPS[tipIndex];
+      el.classList.remove('fade');
+      tipInterval = setInterval(() => {
+        el.classList.add('fade');
+        setTimeout(() => {
+          tipIndex = (tipIndex + 1) % TIPS.length;
+          el.textContent = TIPS[tipIndex];
+          el.classList.remove('fade');
+        }, 400);
+      }, 8000);
+    }
+
+    function stopTips() {
+      if (tipInterval) { clearInterval(tipInterval); tipInterval = null; }
+    }
+
+    function resetModal() {
+      document.getElementById('runningState').style.display = 'block';
+      document.getElementById('doneState').style.display = 'none';
+      document.getElementById('errorState').style.display = 'none';
+      document.getElementById('statusText').textContent = 'Starting pipeline\u2026';
+      document.getElementById('shimmerBar').style.display = 'block';
+      maxActiveIdx = -1;
+      // Reset all pipeline nodes
+      ['ocr','summarize','diagrams','notebook','orchestrate'].forEach(n => {
+        const el = document.getElementById(`node-${n}`);
+        if (el) { el.classList.remove('active', 'done'); }
+      });
+      // Reset timer and tips
+      stopTimer();
+      stopTips();
+      startTimer();
+      startTips();
+    }
+
+    function showDone(sessionId) {
+      stopTimer();
+      stopTips();
+      document.getElementById('shimmerBar').style.display = 'none';
+      document.getElementById('runningState').style.display = 'none';
+      document.getElementById('doneState').style.display = 'block';
+
+      const link = document.getElementById('openDigestLink');
+      link.href = `/result/${sessionId}`;
+
+      // Fetch title
+      fetch(`/session/${sessionId}/info`)
+        .then(r => r.json())
+        .then(d => {
+          if (d.title) document.getElementById('donePaperTitle').textContent = d.title;
+        })
+        .catch(() => {});
+    }
+
+    function showError(message) {
+      stopTimer();
+      stopTips();
+      document.getElementById('shimmerBar').style.display = 'none';
+      document.getElementById('runningState').style.display = 'none';
+      document.getElementById('errorState').style.display = 'block';
+      document.getElementById('errorMessage').textContent = message;
+      document.getElementById('generateBtn').disabled = false;
+    }
+
+    function closeModal() {
+      document.getElementById('modalOverlay').classList.remove('show');
+      document.getElementById('generateBtn').disabled = !selectedFile;
+    }
+  </script>
+</body>
+</html>
