@@ -190,6 +190,7 @@ def _run_pipeline(sid: str, pdf_path: str):
         from diagram_gen import generate_diagrams
         diagram_dir = session_dir / "diagrams"
         diagram_captions = [b.get("caption", f"Diagram {i+1}") for i, b in enumerate(banana_blocks)]
+        session["diagram_captions"] = diagram_captions
 
         _emit(sid, "diagrams", f"Generating {len(banana_blocks)} diagram(s)...")
         t0 = time.time()
@@ -279,6 +280,13 @@ def _run_pipeline(sid: str, pdf_path: str):
             (session_dir / "summary_refined.md").write_text(refined_summary, encoding="utf-8")
         else:
             refined_summary = summary
+
+        # Step 6b: QC validation — fix invalid markers before rendering
+        from orchestrator import validate_final_summary
+        num_tables = len(session.get("important_tables", []))
+        refined_summary, qc_warnings = validate_final_summary(refined_summary, num_tables)
+        if qc_warnings:
+            _emit(sid, "qc", f"QC fixed {len(qc_warnings)} issue(s): {'; '.join(qc_warnings)}")
 
         # Step 7: Final HTML
         _emit(sid, "orchestrate", "Building final digest...")
@@ -484,7 +492,10 @@ async def get_substack_html(sid: str):
         diagram_files = []
 
     diagram_paths = [str(p) for p in diagram_files]
-    diagram_captions = [f"Diagram {i+1}" for i in range(len(diagram_files))]
+    diagram_captions = session.get(
+        "diagram_captions",
+        [f"Diagram {i+1}" for i in range(len(diagram_files))],
+    )
 
     title = session.get("title", "Research Paper")
 
@@ -494,6 +505,7 @@ async def get_substack_html(sid: str):
         diagram_paths=diagram_paths,
         diagram_captions=diagram_captions,
         paper_title=title,
+        important_tables=session.get("important_tables"),
     )
 
     return HTMLResponse(html, media_type="text/html")

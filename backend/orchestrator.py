@@ -290,11 +290,9 @@ def _restore_diagrams(
         idx = diagram_counter[0]
         if idx < len(img_b64_list):
             b64, caption = img_b64_list[idx]
-            fig_num = idx + 1
             replacement = (
                 f'<figure class="paper-diagram">'
                 f'<img src="data:image/webp;base64,{b64}" alt="{caption}" />'
-                f'<figcaption>Figure {fig_num}: {caption}</figcaption>'
                 f'</figure>'
             )
         else:
@@ -339,7 +337,7 @@ def _restore_table_markers(
             replacement = (
                 f'<figure class="paper-diagram">'
                 f'<img src="data:image/webp;base64,{b64}" alt="{caption}" />'
-                f'<figcaption>{caption}</figcaption>'
+                f'<figcaption>Table {table_num + 1}: {caption}</figcaption>'
                 f'</figure>'
             )
         elif 0 <= table_num < len(important_tables):
@@ -352,7 +350,7 @@ def _restore_table_markers(
             )
             replacement = (
                 f'<div class="paper-table">'
-                f'<div class="table-caption">Table: {caption}</div>'
+                f'<div class="table-caption">Table {table_num + 1}: {caption}</div>'
                 f'<div class="table-scroll">{table_html}</div>'
                 f'</div>'
             )
@@ -602,6 +600,55 @@ def _validate_refinement(original: str, refined: str) -> tuple[bool, list[str]]:
     return (len(issues) == 0, issues)
 
 
+def validate_final_summary(
+    summary: str,
+    num_tables: int = 0,
+) -> tuple[str, list[str]]:
+    """Final QC pass: fix invalid markers and detect issues before HTML rendering.
+
+    Unlike _validate_refinement() which returns bool, this FIXES what it can
+    and returns (cleaned_summary, list_of_warnings).
+    """
+    warnings: list[str] = []
+
+    # 1. Strip invalid [TABLE: N] markers (N > num_tables or N < 1)
+    def _check_table_ref(m: re.Match) -> str:
+        n = int(m.group(1))
+        if n < 1 or n > num_tables:
+            warnings.append(f"Removed invalid [TABLE: {n}] (only {num_tables} tables)")
+            return ""
+        return m.group(0)
+    summary = re.sub(r"\[TABLE:\s*(\d+)\]", _check_table_ref, summary)
+
+    # 2. Warn if [TABLE: 1] appears after [TABLE: 2]
+    positions = [
+        (m.start(), int(m.group(1)))
+        for m in re.finditer(r"\[TABLE:\s*(\d+)\]", summary)
+    ]
+    for i in range(len(positions) - 1):
+        if positions[i][1] > positions[i + 1][1]:
+            warnings.append(
+                f"Table markers out of order: [TABLE: {positions[i][1]}] "
+                f"before [TABLE: {positions[i + 1][1]}]"
+            )
+
+    # 3. Strip orphan raw markdown tables
+    summary = _strip_raw_tables(summary)
+
+    # 4. LaTeX delimiter integrity — odd $ count means unmatched math
+    text_no_display = re.sub(r"\$\$.*?\$\$", "", summary, flags=re.DOTALL)
+    single_dollars = re.findall(r"(?<!\$)\$(?!\$)", text_no_display)
+    if len(single_dollars) % 2 != 0:
+        warnings.append(f"Odd number of $ delimiters ({len(single_dollars)})")
+
+    # 5. Unclosed code fences
+    fences = re.findall(r"^```", summary, re.MULTILINE)
+    if len(fences) % 2 != 0:
+        warnings.append(f"Unclosed code fence ({len(fences)} ``` markers)")
+
+    return summary, warnings
+
+
 def refine_summary_with_code(
     summary: str,
     code_snippets: list[dict],
@@ -697,7 +744,7 @@ def _render_body_substack(body: str, img_b64_list: list[tuple[str, str]],
     """Convert section body Markdown to clean semantic HTML for Substack.
 
     Differences from _render_body():
-    - Math left as raw $...$ / $$...$$ (Substack renders LaTeX natively)
+    - Math rendered as PNG images via matplotlib (Substack does not render LaTeX)
     - Code blocks as plain <pre><code> (no Carbon chrome)
     - No custom CSS classes
     - Diagrams as plain <figure><img>
@@ -719,6 +766,7 @@ def _render_body_substack(body: str, img_b64_list: list[tuple[str, str]],
     text = _dedent_markdown_lines(text)
     text, diag_markers = _protect_diagrams(text)
     text, table_markers = _protect_tables(text)
+    text = _strip_raw_tables(text)
 
     html = markdown2.markdown(text, extras=[
         "cuddled-lists",
@@ -744,11 +792,9 @@ def _render_body_substack(body: str, img_b64_list: list[tuple[str, str]],
         idx = diagram_counter[0]
         if idx < len(img_b64_list):
             b64, caption = img_b64_list[idx]
-            fig_num = idx + 1
             replacement = (
                 f'<figure>'
                 f'<img src="data:image/webp;base64,{b64}" alt="{caption}" />'
-                f'<figcaption>Figure {fig_num}: {caption}</figcaption>'
                 f'</figure>'
             )
         else:
@@ -757,21 +803,25 @@ def _render_body_substack(body: str, img_b64_list: list[tuple[str, str]],
         html = html.replace(placeholder, replacement)
         diagram_counter[0] += 1
 
-    # Restore math as raw $...$ / $$...$$ (Substack renders LaTeX natively)
+    # Restore math as rendered PNG images (Substack does NOT render LaTeX)
+    from latex_renderer import latex_to_inline_img, latex_to_block_img
+
     for i, inline in enumerate(math_inlines):
         placeholder = f"<!--MATH_INLINE_{i}-->"
         escaped = f"&lt;!--MATH_INLINE_{i}--&gt;"
-        html = html.replace(f"<code>{placeholder}</code>", inline)
-        html = html.replace(f"<code>{escaped}</code>", inline)
-        html = html.replace(escaped, inline)
-        html = html.replace(placeholder, inline)
+        img_html = latex_to_inline_img(inline)
+        html = html.replace(f"<code>{placeholder}</code>", img_html)
+        html = html.replace(f"<code>{escaped}</code>", img_html)
+        html = html.replace(escaped, img_html)
+        html = html.replace(placeholder, img_html)
     for i, block in enumerate(math_blocks):
         placeholder = f"<!--MATH_BLOCK_{i}-->"
         escaped = f"&lt;!--MATH_BLOCK_{i}--&gt;"
-        html = html.replace(f"<p>{placeholder}</p>", block)
-        html = html.replace(f"<p>{escaped}</p>", block)
-        html = html.replace(escaped, block)
-        html = html.replace(placeholder, block)
+        img_html = latex_to_block_img(block)
+        html = html.replace(f"<p>{placeholder}</p>", img_html)
+        html = html.replace(f"<p>{escaped}</p>", img_html)
+        html = html.replace(escaped, img_html)
+        html = html.replace(placeholder, img_html)
 
     return html
 
@@ -781,11 +831,12 @@ def build_substack_html(
     diagram_paths: list[str],
     diagram_captions: list[str],
     paper_title: str = "Research Paper",
+    important_tables: list[dict] | None = None,
 ) -> str:
     """Build clean, semantic-only HTML optimized for Substack paste.
 
     No <html>/<head>/<body> wrapper, no CSS, no JS, no KaTeX script.
-    Math left as raw $...$ / $$...$$ (Substack renders them natively).
+    Math rendered as PNG images via matplotlib (Substack does not render LaTeX).
     Images as base64 <figure><img> (Substack auto-hosts on publish).
     """
     # Build base64 image list — compressed WebP
@@ -802,7 +853,7 @@ def build_substack_html(
     parts = [f"<h1>{paper_title}</h1>"]
     for sec in sections:
         parts.append(f"<h2>{sec['heading']}</h2>")
-        body_html = _render_body_substack(sec["body"], img_b64_list, diagram_counter)
+        body_html = _render_body_substack(sec["body"], img_b64_list, diagram_counter, important_tables)
         parts.append(body_html)
 
     return "\n".join(parts)

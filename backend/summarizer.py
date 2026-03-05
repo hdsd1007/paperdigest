@@ -283,9 +283,11 @@ def generate_summary(
     if table_descriptions:
         table_block = (
             f"IMPORTANT TABLES (place these in Results & Insights):\n{table_descriptions}\n\n"
-            "Place [TABLE: 1] (and [TABLE: 2] if provided) in the \"Results & Insights\" section, right\n"
-            "after the paragraph discussing those results. These are the paper's own tables — reference\n"
-            "them naturally in your narrative.\n\n"
+            "RULES for table placement:\n"
+            "- ONLY use [TABLE: 1] and [TABLE: 2] markers. Do NOT use any other table numbers.\n"
+            "- Place [TABLE: 1] BEFORE [TABLE: 2] in the document (chronological order).\n"
+            "- Place each marker on its own line, right after the paragraph discussing those results.\n"
+            "- Do NOT include raw markdown tables (| header | ... |) — only the [TABLE: N] markers.\n\n"
         )
 
     prompt = SUMMARY_PROMPT.format(

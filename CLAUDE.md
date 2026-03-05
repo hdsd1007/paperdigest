@@ -87,6 +87,17 @@ The `_render_body()` function converts Markdown to HTML with special handling fo
 
 Title extraction (`extract_title`) only accepts `# heading` lines to avoid picking up arXiv metadata.
 
+### Substack Export (`orchestrator.py` + `latex_renderer.py`)
+
+The Substack export path (`build_substack_html()` / `_render_body_substack()`) produces clean semantic HTML for pasting into Substack's editor:
+- **No CSS, no JS, no KaTeX** — Substack editor doesn't support them
+- **Math as PNG images** — `latex_renderer.py` renders `$...$` and `$$...$$` to base64 PNG via matplotlib's mathtext engine (no external TeX needed). Inline math uses transparent background + `vertical-align:middle`; display math uses white background + centered `<div>`.
+- **Diagrams and tables** — same base64 `<figure>` approach as main digest, with real captions from the session (not generic "Diagram N")
+- **Fallback** — if matplotlib can't render an expression, falls back to `<code>` styled text
+- **Cache** — rendered LaTeX expressions are cached in-memory to avoid re-rendering repeated variable names
+
+Session stores `diagram_captions` and `important_tables` so the `/substack-html/{sid}` endpoint can access descriptive captions without re-running the pipeline.
+
 ### Key Patterns
 
 - **Session management:** In-memory dict in `main.py` (`_sessions`), keyed by short UUID. Not persistent across restarts.
@@ -104,6 +115,8 @@ Title extraction (`extract_title`) only accepts `# heading` lines to avoid picki
 | `/process` | POST | Upload PDF, start pipeline, return `session_id` |
 | `/status/{sid}` | GET | SSE progress stream |
 | `/result/{sid}` | GET | Final HTML digest |
+| `/substack-html/{sid}` | GET | Substack-optimized HTML (math as PNG images) |
+| `/markdown/{sid}` | GET | Markdown with embedded base64 diagrams |
 | `/download/{sid}/{filename}` | GET | Download output files |
 | `/session/{sid}/info` | GET | Session metadata |
 | `/` | GET | Serve frontend |
@@ -139,6 +152,7 @@ Each session writes to `outputs/{session_id}/` with: `paper.pdf`, `paper.md`, `s
 - **No usage tracking** — `usage_tracker.py` was deleted.
 - Frontend UI should NOT expose which models are used — user sees generic labels like "Parse PDF", "Generate Summary", etc.
 - **Figure extraction** uses PyMuPDF (`fitz`) — extracts original figures for archival only (saved to `original_figures/`). No toggle UI; diagrams are AI-generated with art-direction.
-- **Table extraction** is regex-based from parsed markdown + one LLM call for selection. Retries once; fallback picks 2 largest tables by row count so tables always appear if any exist.
+- **Table extraction** is regex-based from parsed markdown + one LLM call for selection. Retries once; fallback picks 2 largest tables by row count so tables always appear if any exist. Table captions must be descriptive (e.g., "Top-1 Accuracy (%) on ImageNet-1K by Method"), not generic.
 - **No image caps** — diagrams render at full resolution (WebP quality 90). No width resize.
 - **Results section** encouraged to have 2 diagrams (main comparison + ablation chart) for visual richness.
+- **LaTeX rendering** — main digest uses KaTeX client-side; Substack export uses `latex_renderer.py` (matplotlib mathtext → PNG). The `_preprocess_latex()` function adapts LaTeX for mathtext compatibility (`\text` → `\mathrm`, strip `\left`/`\right`, `\|` → `\Vert`, etc.).

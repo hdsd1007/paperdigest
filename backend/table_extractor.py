@@ -107,10 +107,14 @@ Skip: hyperparameter tables, dataset statistics (unless crucial), notation table
 Return ONLY a JSON object:
 {{
   "selected": [
-    {{"index": 0, "caption": "Main results on benchmark X"}},
-    {{"index": 3, "caption": "Ablation study results"}}
+    {{"index": 0, "caption": "ImageNet-1K Linear Evaluation Top-1 (%) by Method"}},
+    {{"index": 3, "caption": "Ablation: Impact of Masking Strategy on Top-1 (%)"}}
   ]
 }}
+
+Captions MUST be specific and descriptive — reference the actual metric and comparison from the table columns/rows.
+Bad: "Main results" or "Ablation study results" (too vague).
+Good: "Top-1 Accuracy (%) on ImageNet-1K by Method" or "BLEU Score Comparison Across Model Sizes".
 
 Return ONLY the JSON — no markdown fences, no explanation."""
 
