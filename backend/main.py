@@ -511,6 +511,40 @@ async def get_substack_html(sid: str):
     return HTMLResponse(html, media_type="text/html")
 
 
+@app.get("/substack-text/{sid}")
+async def get_substack_text(sid: str):
+    """Serve text-focused HTML for Substack paste (no images at all).
+
+    Math as Unicode, diagrams as placeholder text, tables as plain HTML.
+    This format actually survives Substack's editor paste.
+    """
+    session = _sessions.get(sid)
+    if not session:
+        raise HTTPException(404, "Session not found")
+    if session["status"] != "done":
+        raise HTTPException(409, f"Not ready yet: {session['status']}")
+
+    session_dir = OUTPUTS_DIR / sid
+
+    md_path = session_dir / "summary_refined.md"
+    if not md_path.exists():
+        md_path = session_dir / "summary.md"
+    if not md_path.exists():
+        raise HTTPException(404, "Markdown file not found")
+
+    md_text = md_path.read_text(encoding="utf-8")
+    title = session.get("title", "Research Paper")
+
+    from orchestrator import build_substack_text_html
+    html = build_substack_text_html(
+        summary=md_text,
+        paper_title=title,
+        important_tables=session.get("important_tables"),
+    )
+
+    return HTMLResponse(html, media_type="text/html")
+
+
 @app.get("/download/{sid}/{filename}")
 async def download_file(sid: str, filename: str):
     safe_name = Path(filename).name

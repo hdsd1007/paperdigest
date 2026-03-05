@@ -13,6 +13,8 @@ OCR_PROMPT = """You are a research paper OCR assistant.
 Your job is to convert the attached PDF into clean, structured Markdown.
 
 Rules:
+- Format the paper title as # Title (h1) at the very top of the output.
+- Do NOT include arXiv identifiers, submission dates, or other metadata in the title heading.
 - Preserve ALL text: abstract, introduction, related work, methodology,
   experiments, results, conclusion, references.
 - Format section headers as ## Section Name.

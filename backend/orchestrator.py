@@ -859,6 +859,146 @@ def build_substack_html(
     return "\n".join(parts)
 
 
+# ---------------------------------------------------------------------------
+# Text-focused Substack export (no images — works with Substack's paste)
+# ---------------------------------------------------------------------------
+
+def _restore_table_markers_text(
+    html: str,
+    markers: list[str],
+    important_tables: list[dict] | None = None,
+) -> str:
+    """Restore [TABLE: N] placeholders as plain HTML tables (no images)."""
+    if not important_tables:
+        important_tables = []
+
+    for i, marker in enumerate(markers):
+        placeholder = f"<!--TABLE_{i}-->"
+        m = re.search(r"\[TABLE:\s*(\d+)\]", marker)
+        table_num = int(m.group(1)) - 1 if m else i
+
+        if 0 <= table_num < len(important_tables):
+            table = important_tables[table_num]
+            caption = table.get("caption", f"Table {table_num + 1}")
+            table_html = markdown2.markdown(table["markdown"], extras=["tables"])
+            replacement = f"<p><strong>Table {table_num + 1}: {caption}</strong></p>\n{table_html}"
+        else:
+            replacement = ""
+
+        html = html.replace(f"<p>{placeholder}</p>", replacement)
+        html = html.replace(placeholder, replacement)
+
+    return html
+
+
+def _render_body_substack_text(body: str, diagram_counter: list[int],
+                                important_tables: list[dict] | None = None) -> str:
+    """Convert section body Markdown to text-focused HTML for Substack paste.
+
+    No images at all — diagrams become placeholder text, math becomes Unicode,
+    tables become plain HTML tables. This actually survives Substack's paste.
+    """
+    text = body.strip()
+    if not text:
+        return ""
+
+    text = _strip_post_equation_blocks(text)
+    text = _strip_backtick_wrapped_math(text)
+
+    text, math_blocks  = _protect_display_math(text)
+    text, math_inlines = _protect_inline_math(text)
+    text, code_blocks  = _protect_code_blocks(text)
+    text = _dedent_markdown_lines(text)
+    text, diag_markers = _protect_diagrams(text)
+    text, table_markers = _protect_tables(text)
+    text = _strip_raw_tables(text)
+
+    html = markdown2.markdown(text, extras=[
+        "cuddled-lists",
+        "code-friendly",
+        "tables",
+    ])
+
+    # Restore tables as plain HTML (no chart images)
+    html = _restore_table_markers_text(html, table_markers, important_tables)
+
+    # Restore code blocks as plain <pre><code>
+    for i, (lang, code) in enumerate(code_blocks):
+        placeholder = f"<!--CODE_BLOCK_{i}-->"
+        display_lang = lang if lang in _KNOWN_LANGS else "python"
+        escaped = code.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        replacement = f'<pre><code class="language-{display_lang}">{escaped}</code></pre>'
+        html = html.replace(f"<p>{placeholder}</p>", replacement)
+        html = html.replace(placeholder, replacement)
+
+    # Restore diagrams as descriptive placeholder text (no images)
+    for i, marker in enumerate(diag_markers):
+        placeholder = f"<!--DIAGRAM_{i}-->"
+        # Extract description from [DIAGRAM: description]
+        desc_match = re.search(r"\[DIAGRAM:\s*(.*?)\]", marker, re.DOTALL)
+        desc = desc_match.group(1).strip() if desc_match else f"Diagram {diagram_counter[0] + 1}"
+        replacement = f'<blockquote><p><em>[Diagram: {desc}]</em></p></blockquote>'
+        html = html.replace(f"<p>{placeholder}</p>", replacement)
+        html = html.replace(placeholder, replacement)
+        diagram_counter[0] += 1
+
+    # Restore math as Unicode text (no images)
+    from unicode_math import latex_to_unicode
+
+    for i, inline in enumerate(math_inlines):
+        placeholder = f"<!--MATH_INLINE_{i}-->"
+        escaped_ph = f"&lt;!--MATH_INLINE_{i}--&gt;"
+        unicode_text = latex_to_unicode(inline)
+        if unicode_text is not None:
+            result = unicode_text
+        else:
+            # Complex expression — show as code
+            clean = inline.strip().strip("$")
+            result = f'<code>{clean}</code>'
+        html = html.replace(f"<code>{placeholder}</code>", result)
+        html = html.replace(f"<code>{escaped_ph}</code>", result)
+        html = html.replace(escaped_ph, result)
+        html = html.replace(placeholder, result)
+
+    for i, block in enumerate(math_blocks):
+        placeholder = f"<!--MATH_BLOCK_{i}-->"
+        escaped_ph = f"&lt;!--MATH_BLOCK_{i}--&gt;"
+        unicode_text = latex_to_unicode(block)
+        if unicode_text is not None:
+            result = f'<p style="text-align:center;"><strong>{unicode_text}</strong></p>'
+        else:
+            clean = block.strip().strip("$")
+            result = f'<pre><code>{clean}</code></pre>'
+        html = html.replace(f"<p>{placeholder}</p>", result)
+        html = html.replace(f"<p>{escaped_ph}</p>", result)
+        html = html.replace(escaped_ph, result)
+        html = html.replace(placeholder, result)
+
+    return html
+
+
+def build_substack_text_html(
+    summary: str,
+    paper_title: str = "Research Paper",
+    important_tables: list[dict] | None = None,
+) -> str:
+    """Build text-focused semantic HTML for Substack paste.
+
+    No images, no CSS, no JS. Math as Unicode, diagrams as placeholders,
+    tables as plain HTML. This survives Substack's editor paste.
+    """
+    sections = _markdown_to_html_sections(summary)
+    diagram_counter = [0]
+
+    parts = [f"<h1>{paper_title}</h1>"]
+    for sec in sections:
+        parts.append(f"<h2>{sec['heading']}</h2>")
+        body_html = _render_body_substack_text(sec["body"], diagram_counter, important_tables)
+        parts.append(body_html)
+
+    return "\n".join(parts)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Main orchestration
 # ─────────────────────────────────────────────────────────────────────────────
@@ -960,6 +1100,8 @@ def build_final_html(
           <div class="export-bar">
             <button onclick="exportDownloadMd()">Download .md</button>
             <button onclick="exportDownloadHtml()">Download HTML</button>
+            <button onclick="window.print()">Download PDF</button>
+            <button onclick="exportCopyLink()">Copy Link</button>
             <button class="substack-btn" onclick="exportCopySubstack()">Copy for Substack</button>
             <span class="export-toast" id="exportToast"></span>
           </div>
@@ -995,6 +1137,10 @@ def build_final_html(
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>{paper_title} — PaperDigest</title>
+  <meta property="og:title" content="{paper_title} — PaperDigest" />
+  <meta property="og:type" content="article" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="{paper_title} — PaperDigest" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
@@ -1026,6 +1172,7 @@ def build_final_html(
       font-family: var(--sans);
       font-size: 17px;
       line-height: 1.75;
+      font-feature-settings: 'kern' 1, 'liga' 1;
     }}
     .layout {{
       display: grid;
@@ -1089,6 +1236,11 @@ def build_final_html(
       color: var(--text);
       background: var(--surface2);
     }}
+    .sidebar ul li a.active {{
+      color: var(--accent);
+      border-left: 2px solid var(--accent);
+      background: var(--accent-dim);
+    }}
     .main {{ padding: 60px 80px; max-width: 860px; }}
     .paper-header {{
       margin-bottom: 56px;
@@ -1120,6 +1272,7 @@ def build_final_html(
       font-weight: 400;
       font-style: italic;
       line-height: 1.2;
+      letter-spacing: -0.02em;
       color: var(--text);
       margin-bottom: 16px;
     }}
@@ -1170,15 +1323,18 @@ def build_final_html(
     .paper-section:first-of-type {{ border-top: none; padding-top: 0; }}
     .paper-section h2 {{
       font-family: var(--sans);
-      font-size: 18px;
+      font-size: 22px;
       font-weight: 600;
+      letter-spacing: -0.01em;
       color: var(--text);
       margin-bottom: 20px;
+      margin-top: 8px;
     }}
     .paper-section h3 {{
       font-family: var(--sans);
       font-size: 16px;
       font-weight: 600;
+      line-height: 1.3;
       color: var(--text);
       margin: 24px 0 12px 0;
     }}
@@ -1186,14 +1342,30 @@ def build_final_html(
       font-family: var(--sans);
       font-size: 15px;
       font-weight: 600;
+      line-height: 1.3;
       color: var(--text);
       margin: 20px 0 10px 0;
     }}
     .paper-section p {{
       color: #1f2937;
-      margin-bottom: 14px;
+      margin-bottom: 18px;
       font-size: 17px;
       line-height: 1.8;
+    }}
+    .paper-section:first-of-type p:first-of-type {{
+      font-size: 19px;
+      line-height: 1.75;
+      color: var(--text);
+    }}
+    .paper-section a {{
+      color: var(--accent);
+      text-decoration: underline;
+      text-decoration-color: rgba(37,99,235,0.3);
+      text-underline-offset: 2px;
+      transition: text-decoration-color 0.15s;
+    }}
+    .paper-section a:hover {{
+      text-decoration-color: var(--accent);
     }}
     .paper-section ul {{
       padding-left: 24px;
@@ -1232,13 +1404,14 @@ def build_final_html(
       border: 1px solid var(--border);
       border-radius: 8px;
       text-align: center;
+      font-size: 1.1em;
     }}
     blockquote {{
-      border-left: 3px solid var(--border);
-      background: transparent;
+      border-left: 3px solid rgba(37,99,235,0.4);
+      background: var(--surface);
       padding: 16px 20px;
       margin: 20px 0;
-      border-radius: 0;
+      border-radius: 0 6px 6px 0;
     }}
     blockquote p {{
       color: #6b7280 !important;
@@ -1293,12 +1466,13 @@ def build_final_html(
       color: #d4d4d4 !important;
     }}
     .paper-diagram {{
-      margin: 32px 0;
+      margin: 40px -20px;
+      max-width: calc(100% + 40px);
       border: 1px solid var(--border);
       border-radius: 16px;
       overflow: hidden;
       background: #ffffff;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
     }}
     .paper-diagram img {{ width: 100%; display: block; }}
     .paper-diagram figcaption {{
@@ -1328,8 +1502,10 @@ def build_final_html(
     }}
     .paper-table td {{
       padding: 8px 12px; border-bottom: 1px solid var(--border);
+      font-variant-numeric: tabular-nums;
     }}
     .paper-table tr:nth-child(even) td {{ background: rgba(0,0,0,.02); }}
+    .paper-table tr:hover td {{ background: var(--accent-dim); }}
     .notebook-cta {{
       display: flex;
       align-items: center;
@@ -1440,9 +1616,83 @@ def build_final_html(
     @media (max-width: 900px) {{
       .layout {{ grid-template-columns: 1fr; }}
       .sidebar {{ display: none; }}
+      .mobile-toc-btn {{ display: flex; }}
       .main {{ padding: 40px 24px; }}
       .notebook-cta {{ flex-direction: column; align-items: flex-start; }}
       .export-bar {{ flex-wrap: wrap; }}
+      .paper-diagram {{ margin: 24px 0; max-width: 100%; }}
+    }}
+    @media (max-width: 600px) {{
+      body {{ font-size: 15px; }}
+      .main {{ padding: 24px 16px; }}
+      .paper-section h2 {{ font-size: 19px; }}
+      .paper-section:first-of-type p:first-of-type {{ font-size: 17px; }}
+      .paper-diagram {{ margin: 16px -16px; max-width: calc(100% + 32px); border-radius: 0; }}
+    }}
+    .mobile-toc-btn {{
+      display: none;
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      box-shadow: 0 4px 12px rgba(37,99,235,0.3);
+      z-index: 998;
+      transition: transform 0.15s;
+    }}
+    .mobile-toc-btn:hover {{ transform: scale(1.1); }}
+    .mobile-toc-overlay {{
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 999;
+    }}
+    .mobile-toc-overlay.open {{ display: block; }}
+    .mobile-toc-panel {{
+      position: fixed;
+      top: 0; left: 0; bottom: 0;
+      width: 280px;
+      max-width: 80vw;
+      background: var(--bg);
+      padding: 40px 24px;
+      overflow-y: auto;
+      z-index: 1000;
+      box-shadow: 4px 0 16px rgba(0,0,0,0.1);
+    }}
+    .mobile-toc-close {{
+      position: absolute;
+      top: 12px; right: 12px;
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: var(--muted);
+    }}
+    .table-scroll {{ -webkit-overflow-scrolling: touch; }}
+    @media print {{
+      .sidebar, .reading-progress, .export-section, .mobile-toc-btn, .mobile-toc-overlay {{ display: none !important; }}
+      .layout {{ grid-template-columns: 1fr !important; }}
+      .main {{ padding: 0 !important; max-width: 100% !important; }}
+      .paper-diagram {{ break-inside: avoid; page-break-inside: avoid; }}
+      .paper-table {{ break-inside: avoid; }}
+      .code-window {{ break-inside: avoid; }}
+      .math-block {{ break-inside: avoid; }}
+      .notebook-cta {{ break-inside: avoid; }}
+      body {{ font-size: 11pt; line-height: 1.6; }}
+      h1 {{ font-size: 24pt !important; }}
+      .paper-section h2 {{ font-size: 16pt !important; }}
+      .paper-diagram img {{ max-width: 100% !important; }}
+      .paper-diagram {{ margin: 16px 0; max-width: 100%; }}
+      @page {{ margin: 1in; }}
     }}
   </style>
 </head>
@@ -1457,6 +1707,19 @@ def build_final_html(
       <div class="toc-label">Contents</div>
       <ul>{toc_html}</ul>
     </aside>
+
+    <button class="mobile-toc-btn" onclick="document.getElementById('mobileTocOverlay').classList.add('open')" aria-label="Table of contents">&#9776;</button>
+    <div class="mobile-toc-overlay" id="mobileTocOverlay" onclick="this.classList.remove('open')">
+      <div class="mobile-toc-panel" onclick="event.stopPropagation()">
+        <button class="mobile-toc-close" onclick="document.getElementById('mobileTocOverlay').classList.remove('open')">&times;</button>
+        <div class="sidebar-brand">
+          <div class="logo-chip">PD</div>
+          <span>PaperDigest</span>
+        </div>
+        <div class="toc-label">Contents</div>
+        <ul>{toc_html}</ul>
+      </div>
+    </div>
 
     <main class="main">
       <header class="paper-header">
@@ -1482,12 +1745,9 @@ def build_final_html(
     const observer = new IntersectionObserver(entries => {{
       entries.forEach(e => {{
         if (e.isIntersecting) {{
-          links.forEach(l => {{ l.style.color = ''; l.style.borderLeftColor = ''; }});
+          links.forEach(l => l.classList.remove('active'));
           const active = document.querySelector(`.sidebar a[href="#${{e.target.id}}"]`);
-          if (active) {{
-            active.style.color = 'var(--accent)';
-            active.style.borderLeftColor = 'var(--accent)';
-          }}
+          if (active) active.classList.add('active');
         }}
       }});
     }}, {{ rootMargin: '-20% 0px -60% 0px' }});
@@ -1559,6 +1819,19 @@ def build_final_html(
       }}
     }}
 
+    function exportCopyLink() {{
+      navigator.clipboard.writeText(window.location.href)
+        .then(() => _showToast('Link copied!'))
+        .catch(() => _showToast('Copy failed'));
+    }}
+
+    // Close mobile TOC when a link is clicked
+    document.querySelectorAll('.mobile-toc-panel a').forEach(a => {{
+      a.addEventListener('click', () => {{
+        document.getElementById('mobileTocOverlay').classList.remove('open');
+      }});
+    }});
+
     function exportDownloadMd() {{
       const a = document.createElement('a');
       a.href = '/markdown/' + _sid;
@@ -1583,12 +1856,13 @@ def build_final_html(
 
     async function exportCopySubstack() {{
       try {{
-        const resp = await fetch('/substack-html/' + _sid);
+        const resp = await fetch('/substack-text/' + _sid);
         if (!resp.ok) throw new Error('Failed to fetch Substack HTML');
         const html = await resp.text();
-        const blob = new Blob([html], {{ type: 'text/html' }});
+        const htmlBlob = new Blob([html], {{ type: 'text/html' }});
+        const textBlob = new Blob([html.replace(/<[^>]*>/g, '')], {{ type: 'text/plain' }});
         await navigator.clipboard.write([
-          new ClipboardItem({{ 'text/html': blob }})
+          new ClipboardItem({{ 'text/html': htmlBlob, 'text/plain': textBlob }})
         ]);
         _showToast('Copied! Paste into Substack editor');
       }} catch (e) {{
@@ -1625,13 +1899,22 @@ def extract_title(paper_markdown: str) -> str:
         # Skip metadata-like lines
         if any(stripped.startswith(c) for c in ["[", ">", "|", "http", "!"]):
             break
+        # Skip arXiv metadata lines
+        if re.match(r'(?i)^arxiv:\d+\.\d+', stripped):
+            continue
         if len(stripped) > 200:  # too long for a title
             break
         title_parts.append(stripped)
         if len(title_parts) >= 2:  # max 2 lines for title
             break
 
-    return " ".join(title_parts) if title_parts else "Research Paper"
+    title = " ".join(title_parts) if title_parts else "Research Paper"
+    # Strip any inline arXiv prefix (e.g. "arXiv:2512.10942v2 [cs.CV] 2 Feb 2026 Title...")
+    title = re.sub(
+        r'(?i)^arxiv:\S+\s*(\[[\w.\-]+\])?\s*\d*\s*\w*\s*\d{0,4}\s*',
+        '', title,
+    ).strip()
+    return title or "Research Paper"
 
 
 def extract_paper_metadata(paper_markdown: str) -> dict:

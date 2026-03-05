@@ -87,16 +87,17 @@ The `_render_body()` function converts Markdown to HTML with special handling fo
 
 Title extraction (`extract_title`) only accepts `# heading` lines to avoid picking up arXiv metadata.
 
-### Substack Export (`orchestrator.py` + `latex_renderer.py`)
+### Substack Export (`orchestrator.py` + `unicode_math.py`)
 
-The Substack export path (`build_substack_html()` / `_render_body_substack()`) produces clean semantic HTML for pasting into Substack's editor:
-- **No CSS, no JS, no KaTeX** — Substack editor doesn't support them
-- **Math as PNG images** — `latex_renderer.py` renders `$...$` and `$$...$$` to base64 PNG via matplotlib's mathtext engine (no external TeX needed). Inline math uses transparent background + `vertical-align:middle`; display math uses white background + centered `<div>`.
-- **Diagrams and tables** — same base64 `<figure>` approach as main digest, with real captions from the session (not generic "Diagram N")
-- **Fallback** — if matplotlib can't render an expression, falls back to `<code>` styled text
-- **Cache** — rendered LaTeX expressions are cached in-memory to avoid re-rendering repeated variable names
+**Two Substack export paths exist:**
 
-Session stores `diagram_captions` and `important_tables` so the `/substack-html/{sid}` endpoint can access descriptive captions without re-running the pipeline.
+1. **Text-focused (active, `/substack-text/{sid}`)** — `build_substack_text_html()` / `_render_body_substack_text()`. This is what the "Copy for Substack" button uses. No images at all (Substack strips base64 on paste). Math converted to Unicode via `unicode_math.py`, diagrams become placeholder blockquotes, tables render as plain HTML `<table>`. Clipboard writes both `text/html` and `text/plain` MIME types.
+
+2. **Image-based (legacy, `/substack-html/{sid}`)** — `build_substack_html()` / `_render_body_substack()`. Math as PNG via `latex_renderer.py`, diagrams as base64. Kept for API compatibility but Substack strips base64 images on paste, so this path is largely broken for actual Substack use.
+
+`unicode_math.py` converts LaTeX to Unicode characters (Greek letters, sub/superscripts, operators). Complex expressions (environments, deep nesting) fall back to `<code>` blocks. No external dependencies.
+
+Session stores `diagram_captions` and `important_tables` so both endpoints can access descriptive captions without re-running the pipeline.
 
 ### Key Patterns
 
@@ -115,7 +116,8 @@ Session stores `diagram_captions` and `important_tables` so the `/substack-html/
 | `/process` | POST | Upload PDF, start pipeline, return `session_id` |
 | `/status/{sid}` | GET | SSE progress stream |
 | `/result/{sid}` | GET | Final HTML digest |
-| `/substack-html/{sid}` | GET | Substack-optimized HTML (math as PNG images) |
+| `/substack-html/{sid}` | GET | Substack-optimized HTML (math as PNG images) — legacy |
+| `/substack-text/{sid}` | GET | Text-focused Substack HTML (Unicode math, no images) |
 | `/markdown/{sid}` | GET | Markdown with embedded base64 diagrams |
 | `/download/{sid}/{filename}` | GET | Download output files |
 | `/session/{sid}/info` | GET | Session metadata |
