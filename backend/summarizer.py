@@ -15,7 +15,7 @@ NUM_DIAGRAMS = int(os.getenv("NUM_DIAGRAMS", "4"))
 
 # ── 1. Summary prompt ────────────────────────────────────────────────────────
 
-SUMMARY_PROMPT = """You are a science storyteller writing a Substack deep-dive. Write a narrative digest (~2000-2500 words, max 15-minute read) that takes a curious reader from "why should I care?" to solid understanding.
+SUMMARY_PROMPT = """You are a science storyteller writing a Substack deep-dive. Write a narrative digest (~1200-1700 words, max 10-minute read) that takes a curious reader from "why should I care?" to solid understanding.
 
 STORYTELLING APPROACH:
 Every section starts simple enough for a smart 15-year-old, then layers in technical depth.
@@ -155,13 +155,13 @@ SECTION PLACEMENT (all 4 arcs REQUIRED):
 - **How It Works:** MUST contain Arc 3 (full blueprint/pipeline).
 - **Results & Insights:** MUST contain Arc 4 (evidence chart with exact numbers).
 
-LENGTH CALIBRATION (strict — target 2000-2500 words, max 15-minute read):
-- The Big Picture: ~300-400 words
-- The Core Idea: ~600-800 words (deepest section)
-- How It Works: ~400-500 words
-- Results & Insights: ~350-450 words
-- Limitations & Future: ~100-150 words
-- Key Takeaways: ~80-120 words
+LENGTH CALIBRATION (strict — target 1200-1700 words, max 10-minute read):
+- The Big Picture: ~200-300 words
+- The Core Idea: ~400-550 words (deepest section)
+- How It Works: ~250-350 words
+- Results & Insights: ~250-350 words
+- Limitations & Future: ~80-120 words
+- Key Takeaways: ~60-80 words
 
 OUTPUT RULES:
 - Output ONLY valid Markdown.
@@ -192,12 +192,12 @@ def _validate_summary(summary: str, profile: dict | None = None, has_tables: boo
     """
     issues: list[str] = []
 
-    # 1. Word count between 1200-3000
+    # 1. Word count between 800-2200
     word_count = len(summary.split())
-    if word_count < 1200:
-        issues.append(f"Too short ({word_count} words, min 1200)")
-    elif word_count > 3000:
-        issues.append(f"Too long ({word_count} words, max 3000)")
+    if word_count < 800:
+        issues.append(f"Too short ({word_count} words, min 800)")
+    elif word_count > 2200:
+        issues.append(f"Too long ({word_count} words, max 2200)")
 
     # 2. All 6 required section headings present
     for heading in REQUIRED_SECTIONS:

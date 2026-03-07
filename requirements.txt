@@ -21,3 +21,4 @@ matplotlib>=3.8
 pandas>=2.0
 tenacity>=8.0
 structlog>=24.0
+python-substack

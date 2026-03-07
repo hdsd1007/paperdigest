@@ -41,6 +41,9 @@ cd backend && uvicorn main:app --reload --port 8000
 - `PAPERBANANA_ITERATIONS` (optional) — diagram refinement iterations, defaults to 3
 - `ART_DIRECT` (optional) — number of art-direction passes per diagram (default: `1`). Set `0` to disable.
 - `ORCHESTRATOR_ITERATIONS` (optional) — code-into-summary refinement passes, defaults to 5 (set 0 to skip)
+- `SUBSTACK_COOKIE` (optional) — Substack `connect.sid` cookie for automated publishing. Get from F12 → Application → Cookies.
+- `SUBSTACK_URL` (optional) — Substack publication URL (e.g., `https://yourname.substack.com`). Required with `SUBSTACK_COOKIE`.
+
 
 ## Architecture
 
@@ -87,17 +90,21 @@ The `_render_body()` function converts Markdown to HTML with special handling fo
 
 Title extraction (`extract_title`) only accepts `# heading` lines to avoid picking up arXiv metadata.
 
-### Substack Export (`orchestrator.py` + `unicode_math.py`)
+### Substack Export & Publishing
 
-**Two Substack export paths exist:**
+**Three Substack export paths exist:**
 
-1. **Text-focused (active, `/substack-text/{sid}`)** — `build_substack_text_html()` / `_render_body_substack_text()`. This is what the "Copy for Substack" button uses. No images at all (Substack strips base64 on paste). Math converted to Unicode via `unicode_math.py`, diagrams become placeholder blockquotes, tables render as plain HTML `<table>`. Clipboard writes both `text/html` and `text/plain` MIME types.
+1. **API Publishing (primary, `/publish-substack/{sid}`)** — `substack_publisher.py`. Uses `python-substack` library to upload diagrams to Substack's CDN and create a draft post via API. Requires `SUBSTACK_COOKIE` and `SUBSTACK_URL` in `.env`. Preprocesses markdown: math → Unicode, diagrams → uploaded CDN images, tables → code blocks. "Publish to Substack" button (hidden if not configured).
 
-2. **Image-based (legacy, `/substack-html/{sid}`)** — `build_substack_html()` / `_render_body_substack()`. Math as PNG via `latex_renderer.py`, diagrams as base64. Kept for API compatibility but Substack strips base64 images on paste, so this path is largely broken for actual Substack use.
+2. **Text-focused (fallback, `/substack-text/{sid}`)** — `build_substack_text_html()` / `_render_body_substack_text()`. "Copy for Substack" button. No images (Substack strips base64 on paste). Math → Unicode, diagrams → placeholder blockquotes, tables → plain HTML. Clipboard writes both `text/html` and `text/plain` MIME types.
+
+3. **Image-based (legacy, `/substack-html/{sid}`)** — `build_substack_html()` / `_render_body_substack()`. Math as PNG, diagrams as base64. Broken for actual Substack use (base64 stripped on paste). Kept for API compatibility.
+
+`substack_publisher.py` handles auth (cookie-based), image upload to Substack CDN (`api.get_image()`), markdown preprocessing, and draft/publish workflow. Rate-limits image uploads (0.5s between). Falls back gracefully per-image on failure.
 
 `unicode_math.py` converts LaTeX to Unicode characters (Greek letters, sub/superscripts, operators). Complex expressions (environments, deep nesting) fall back to `<code>` blocks. No external dependencies.
 
-Session stores `diagram_captions` and `important_tables` so both endpoints can access descriptive captions without re-running the pipeline.
+Session stores `diagram_captions` and `important_tables` so all endpoints can access descriptive captions without re-running the pipeline.
 
 ### Key Patterns
 
@@ -120,6 +127,9 @@ Session stores `diagram_captions` and `important_tables` so both endpoints can a
 | `/substack-text/{sid}` | GET | Text-focused Substack HTML (Unicode math, no images) |
 | `/markdown/{sid}` | GET | Markdown with embedded base64 diagrams |
 | `/download/{sid}/{filename}` | GET | Download output files |
+| `/download/{sid}/diagrams.zip` | GET | ZIP of all diagram PNGs (for manual Substack upload) |
+| `/substack-config` | GET | Check if Substack publishing credentials are configured |
+| `/publish-substack/{sid}` | POST | Publish digest to Substack (draft by default, `?publish=true` to publish) |
 | `/session/{sid}/info` | GET | Session metadata |
 | `/` | GET | Serve frontend |
 

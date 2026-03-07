@@ -37,11 +37,15 @@ _SUPERSCRIPTS = {
     "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴",
     "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹",
     "a": "ᵃ", "b": "ᵇ", "c": "ᶜ", "d": "ᵈ", "e": "ᵉ",
-    "i": "ⁱ", "j": "ʲ", "k": "ᵏ", "n": "ⁿ", "o": "ᵒ",
+    "f": "ᶠ", "g": "ᵍ", "h": "ʰ", "i": "ⁱ", "j": "ʲ",
+    "k": "ᵏ", "l": "ˡ", "m": "ᵐ", "n": "ⁿ", "o": "ᵒ",
     "p": "ᵖ", "r": "ʳ", "s": "ˢ", "t": "ᵗ", "u": "ᵘ",
     "v": "ᵛ", "w": "ʷ", "x": "ˣ", "y": "ʸ", "z": "ᶻ",
     "+": "⁺", "-": "⁻", "=": "⁼", "(": "⁽", ")": "⁾",
-    "T": "ᵀ",
+    "A": "ᴬ", "B": "ᴮ", "D": "ᴰ", "E": "ᴱ", "G": "ᴳ",
+    "H": "ᴴ", "I": "ᴵ", "J": "ᴶ", "K": "ᴷ", "L": "ᴸ",
+    "M": "ᴹ", "N": "ᴺ", "O": "ᴼ", "P": "ᴾ", "R": "ᴿ",
+    "T": "ᵀ", "U": "ᵁ", "V": "ⱽ", "W": "ᵂ",
 }
 
 # Mathematical operators and symbols
@@ -73,6 +77,7 @@ _SYMBOLS = {
     r"\dagger": "†",
     r"\quad": " ", r"\qquad": "  ", r"\,": " ", r"\;": " ", r"\:": " ",
     r"\ ": " ",
+    r"\|": "‖",
 }
 
 # Patterns that indicate an expression is too complex for Unicode
@@ -194,6 +199,19 @@ def latex_to_unicode(raw_math: str) -> str | None:
     # Convert subscripts and superscripts
     text = _convert_scripts(text, _SUBSCRIPTS, "_")
     text = _convert_scripts(text, _SUPERSCRIPTS, "^")
+
+    # Diacriticals: \hat{X} → X̂, \bar{X} → X̄, etc.
+    # MUST come before brace removal — otherwise \hat{x} → \hatx → deleted
+    text = re.sub(r"\\hat\{([^}]*)\}", r"\1\u0302", text)
+    text = re.sub(r"\\bar\{([^}]*)\}", r"\1\u0304", text)
+    text = re.sub(r"\\tilde\{([^}]*)\}", r"\1\u0303", text)
+    text = re.sub(r"\\vec\{([^}]*)\}", r"\1\u20D7", text)
+    text = re.sub(r"\\dot\{([^}]*)\}", r"\1\u0307", text)
+    text = re.sub(r"\\ddot\{([^}]*)\}", r"\1\u0308", text)
+    # No-brace forms: \hat x → x̂
+    text = re.sub(r"\\hat\s+([A-Za-z])", r"\1\u0302", text)
+    text = re.sub(r"\\bar\s+([A-Za-z])", r"\1\u0304", text)
+    text = re.sub(r"\\tilde\s+([A-Za-z])", r"\1\u0303", text)
 
     # Clean up remaining LaTeX artifacts
     text = text.replace("{", "").replace("}", "")

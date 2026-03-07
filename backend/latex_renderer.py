@@ -125,6 +125,58 @@ def render_latex_to_b64png(
         return None
 
 
+def render_latex_to_png_file(
+    latex: str,
+    fontsize: int = 16,
+    dpi: int = 200,
+) -> str | None:
+    """Render LaTeX to a temporary PNG file on disk.
+
+    Returns the file path, or None if rendering fails.
+    Caller is responsible for deleting the file after use.
+    """
+    import tempfile
+
+    latex = latex.strip()
+    if not latex:
+        return None
+
+    latex = _preprocess_latex(latex)
+
+    try:
+        fig = plt.figure(figsize=(10, 1))
+        fig.text(
+            0.5, 0.5,
+            f"${latex}$",
+            fontsize=fontsize,
+            math_fontfamily="cm",
+            color="black",
+            ha="center",
+            va="center",
+        )
+
+        tmp = tempfile.NamedTemporaryFile(
+            suffix=".png", delete=False, prefix="latex_"
+        )
+        tmp_path = tmp.name
+        tmp.close()
+
+        fig.savefig(
+            tmp_path,
+            format="png",
+            dpi=dpi,
+            bbox_inches="tight",
+            pad_inches=0.05,
+            transparent=False,
+            facecolor="white",
+        )
+        plt.close(fig)
+        return tmp_path
+    except Exception:
+        plt.close("all")
+        return None
+
+
 # ── Public API ───────────────────────────────────────────────────────────────
 
 def latex_to_inline_img(raw_math: str) -> str:

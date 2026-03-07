@@ -72,13 +72,13 @@ Every section should end with a sentence that leads into the next.
 
 ## Length Calibration
 
-- Target ~2000-2500 words (max 15-minute read)
-- The Big Picture: ~300-400 words
-- The Core Idea: ~600-800 words (deepest section)
-- How It Works: ~400-500 words
-- Results & Insights: ~350-450 words
-- Limitations & Future: ~100-150 words
-- Key Takeaways: ~80-120 words
+- Target ~1200-1700 words (max 10-minute read)
+- The Big Picture: ~200-300 words
+- The Core Idea: ~400-550 words (deepest section)
+- How It Works: ~250-350 words
+- Results & Insights: ~250-350 words
+- Limitations & Future: ~80-120 words
+- Key Takeaways: ~60-80 words
 
 ## Anti-Patterns (avoid these)
 

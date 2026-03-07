@@ -70,6 +70,34 @@ def _get_context(lines: list[str], table_start: int) -> str:
     return ""
 
 
+def _validate_caption(caption: str, fallback_idx: int) -> str:
+    """Validate caption quality. Return cleaned caption or generic fallback."""
+    if not caption or not caption.strip():
+        return f"Table {fallback_idx}: Key Results"
+
+    caption = caption.strip()
+
+    bracket_count = caption.count("[") + caption.count("]")
+    slash_count = caption.count("/")
+    pipe_count = caption.count("|")
+    citation_fragments = len(re.findall(r"\[[A-Z][a-z]+(?:\s+(?:and|et\s+al))?", caption))
+
+    is_garbled = (
+        bracket_count >= 4
+        or (bracket_count >= 2 and slash_count >= 2)
+        or pipe_count >= 2
+        or citation_fragments >= 2
+        or (len(caption) < 20 and bracket_count >= 2)
+    )
+
+    if is_garbled:
+        return f"Table {fallback_idx}: Key Results"
+
+    # Strip trailing citation markers
+    caption = re.sub(r"\s*\[[\w\s.,]+\]\s*$", "", caption)
+    return caption.strip() or f"Table {fallback_idx}: Key Results"
+
+
 def select_important_tables(
     tables: list[dict],
     max_tables: int = 2,
@@ -159,7 +187,7 @@ Return ONLY the JSON — no markdown fences, no explanation."""
         fallback = []
         for t in ranked[:max_tables]:
             table = dict(t)
-            table["caption"] = t["context"] or "Key results"
+            table["caption"] = _validate_caption(t["context"], len(fallback) + 1)
             fallback.append(table)
         print(f"[table_extractor] Using fallback: {len(fallback)} largest table(s) by row count")
         return fallback

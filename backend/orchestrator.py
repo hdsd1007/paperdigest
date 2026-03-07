@@ -699,7 +699,7 @@ RULES:
    - Training loops, evaluation loops, data generation
    - Generic utilities (generate_completions, train_agent)
 9. NEVER wrap explanatory prose in a code fence. Only actual Python code goes in ```python ... ``` blocks. Do NOT use ```php-template, ```output, ```text or any other fake lang tag — write prose as plain markdown paragraphs.
-10. NEVER write bare variable names outside of LaTeX delimiters. Every variable must be in $...$. WRONG: "zz is updated". RIGHT: "$z$ is updated". Doubled text like "zz" or "yy" means the variable is undelimited — forbidden.
+10. In PROSE text (not code blocks), NEVER write bare variable names outside of LaTeX delimiters. Every variable must be in $...$. WRONG: "zz is updated". RIGHT: "$z$ is updated". Doubled text like "zz" or "yy" means the variable is undelimited — forbidden. INSIDE ```python ... ``` code blocks, write plain Python — NEVER use $...$ or \_ in code.
 11. NEVER wrap $...$ or $$...$$ in backticks. Write $x$ directly, NOT `$x$`. Backtick-wrapped math breaks rendering.
 12. NEVER follow a display equation ($$...$$) with a variable-by-variable interpretation block like "Here, $X$ is..., $Y$ is...". Move on to the next idea after the equation.
 13. Return ONLY the full refined summary — no explanations before or after.
@@ -922,22 +922,21 @@ def _render_body_substack_text(body: str, diagram_counter: list[int],
     # Restore tables as plain HTML (no chart images)
     html = _restore_table_markers_text(html, table_markers, important_tables)
 
-    # Restore code blocks as plain <pre><code>
+    # Restore code blocks — no class attribute for Substack ProseMirror compat
     for i, (lang, code) in enumerate(code_blocks):
         placeholder = f"<!--CODE_BLOCK_{i}-->"
-        display_lang = lang if lang in _KNOWN_LANGS else "python"
         escaped = code.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        replacement = f'<pre><code class="language-{display_lang}">{escaped}</code></pre>'
+        replacement = f'<pre><code>{escaped}</code></pre>'
         html = html.replace(f"<p>{placeholder}</p>", replacement)
         html = html.replace(placeholder, replacement)
 
-    # Restore diagrams as descriptive placeholder text (no images)
+    # Restore diagrams as numbered placeholders (user uploads images manually)
     for i, marker in enumerate(diag_markers):
         placeholder = f"<!--DIAGRAM_{i}-->"
-        # Extract description from [DIAGRAM: description]
         desc_match = re.search(r"\[DIAGRAM:\s*(.*?)\]", marker, re.DOTALL)
-        desc = desc_match.group(1).strip() if desc_match else f"Diagram {diagram_counter[0] + 1}"
-        replacement = f'<blockquote><p><em>[Diagram: {desc}]</em></p></blockquote>'
+        num = diagram_counter[0] + 1
+        desc = desc_match.group(1).strip() if desc_match else f"Diagram {num}"
+        replacement = f'<blockquote><p><em>[Diagram {num}: {desc} — upload image manually]</em></p></blockquote>'
         html = html.replace(f"<p>{placeholder}</p>", replacement)
         html = html.replace(placeholder, replacement)
         diagram_counter[0] += 1
@@ -968,7 +967,7 @@ def _render_body_substack_text(body: str, diagram_counter: list[int],
             result = f'<p style="text-align:center;"><strong>{unicode_text}</strong></p>'
         else:
             clean = block.strip().strip("$")
-            result = f'<pre><code>{clean}</code></pre>'
+            result = f'<p style="text-align:center;"><code>{clean}</code></p>'
         html = html.replace(f"<p>{placeholder}</p>", result)
         html = html.replace(f"<p>{escaped_ph}</p>", result)
         html = html.replace(escaped_ph, result)
@@ -1102,7 +1101,9 @@ def build_final_html(
             <button onclick="exportDownloadHtml()">Download HTML</button>
             <button onclick="window.print()">Download PDF</button>
             <button onclick="exportCopyLink()">Copy Link</button>
-            <button class="substack-btn" onclick="exportCopySubstack()">Copy for Substack</button>
+            <button class="substack-publish-btn" id="substackPublishBtn" onclick="exportPublishSubstack()" style="display:none">Publish to Substack</button>
+            <button class="substack-btn" id="substackBtn" onclick="exportCopySubstack()">Copy for Substack</button>
+            <button onclick="exportDownloadDiagrams()">Download Diagrams</button>
             <span class="export-toast" id="exportToast"></span>
           </div>
         </section>"""
@@ -1599,8 +1600,13 @@ def build_final_html(
       color: #fff;
       border-color: var(--accent);
     }}
-    .export-bar button.substack-btn {{ background: #FF6719; color: #fff; border-color: #FF6719; }}
-    .export-bar button.substack-btn:hover {{ background: #e85d16; border-color: #e85d16; }}
+    .export-bar button.substack-publish-btn {{ background: #FF6719; color: #fff; border-color: #FF6719; font-weight: 600; }}
+    .export-bar button.substack-publish-btn:hover {{ background: #e85d16; border-color: #e85d16; }}
+    .export-bar button.substack-publish-btn:disabled {{ opacity: 0.7; cursor: wait; }}
+    .export-bar button.substack-publish-btn.success {{ background: #22c55e; border-color: #22c55e; }}
+    .export-bar button.substack-btn {{ color: #FF6719; border-color: #FF6719; }}
+    .export-bar button.substack-btn:hover {{ background: #FF6719; color: #fff; border-color: #FF6719; }}
+    .export-bar button.substack-btn:disabled {{ opacity: 0.7; cursor: wait; }}
     .export-bar .export-toast {{
       background: var(--text);
       color: #fff;
@@ -1807,15 +1813,16 @@ def build_final_html(
         const colabUrl = 'https://colab.research.google.com/url/' + encodeURIComponent(nbUrl);
         window.open(colabUrl, '_blank');
       }} else {{
-        // Localhost — Colab can't reach us, so download + open Colab upload
-        window.open('https://colab.research.google.com/', '_blank');
+        // Localhost — Colab can't reach local files, download + instruct user
         const a = document.createElement('a');
         a.href = nbUrl;
         a.download = 'paper_notebook.ipynb';
         document.body.appendChild(a);
         a.click();
         a.remove();
-        _showToast('Notebook downloaded! In Colab → File → Upload notebook', 6000);
+        // Open Colab after a small delay to avoid popup blocker
+        setTimeout(() => window.open('https://colab.research.google.com/#create=true', '_blank'), 500);
+        _showToast('Notebook downloading! Open Colab → File → Upload notebook to run it', 8000);
       }}
     }}
 
@@ -1854,7 +1861,72 @@ def build_final_html(
       URL.revokeObjectURL(url);
     }}
 
+    function exportDownloadDiagrams() {{
+      const a = document.createElement('a');
+      a.href = '/download/' + _sid + '/diagrams.zip';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }}
+
+    // Check Substack config on load — show publish button if configured
+    fetch('/substack-config')
+      .then(r => r.json())
+      .then(d => {{
+        if (d.configured) {{
+          const btn = document.getElementById('substackPublishBtn');
+          if (btn) btn.style.display = '';
+        }}
+      }})
+      .catch(() => {{}});
+
+    async function exportPublishSubstack() {{
+      const btn = document.getElementById('substackPublishBtn');
+      const origText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Publishing...';
+      btn.classList.remove('success');
+      try {{
+        const resp = await fetch('/publish-substack/' + _sid, {{ method: 'POST' }});
+        if (!resp.ok) {{
+          const err = await resp.json().catch(() => ({{}}));
+          throw new Error(err.detail || 'Publishing failed');
+        }}
+        const data = await resp.json();
+        const label = data.status === 'published' ? 'Published' : 'Draft created';
+        btn.textContent = label + '!';
+        btn.classList.add('success');
+        if (data.url) {{
+          let toast = label + '! Opening Substack...';
+          if (data.failed_images > 0) toast = label + '! (' + data.failed_images + ' image(s) failed to upload)';
+          _showToast(toast);
+          window.open(data.url, '_blank');
+          setTimeout(() => {{
+            btn.textContent = 'View on Substack';
+            btn.disabled = false;
+            btn.onclick = () => window.open(data.url, '_blank');
+          }}, 3000);
+        }} else {{
+          _showToast(label + ' on Substack!');
+          setTimeout(() => {{
+            btn.textContent = origText;
+            btn.disabled = false;
+            btn.classList.remove('success');
+          }}, 3000);
+        }}
+      }} catch (e) {{
+        _showToast('Publish failed: ' + e.message);
+        btn.textContent = origText;
+        btn.disabled = false;
+        btn.classList.remove('success');
+      }}
+    }}
+
     async function exportCopySubstack() {{
+      const btn = document.getElementById('substackBtn');
+      const origText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Preparing export...';
       try {{
         const resp = await fetch('/substack-text/' + _sid);
         if (!resp.ok) throw new Error('Failed to fetch Substack HTML');
@@ -1867,6 +1939,9 @@ def build_final_html(
         _showToast('Copied! Paste into Substack editor');
       }} catch (e) {{
         _showToast('Copy failed: ' + e.message);
+      }} finally {{
+        btn.disabled = false;
+        btn.textContent = origText;
       }}
     }}
   </script>

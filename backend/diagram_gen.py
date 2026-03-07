@@ -649,7 +649,7 @@ async def _run_all(banana_blocks: list[dict], output_dir: str) -> list[str]:
 
     async def _guarded(idx: int, block: dict) -> str | None:
         name = block.get("filename", f"diagram_{idx}")
-        dest = os.path.join(output_dir, f"{name}.png")
+        dest = os.path.join(output_dir, f"{idx:03d}_{name}.png")
 
         # Determine diagram type — force Arc 4 to statistical_plot
         dtype = block.get("diagram_type", "methodology")

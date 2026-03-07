@@ -545,6 +545,109 @@ async def get_substack_text(sid: str):
     return HTMLResponse(html, media_type="text/html")
 
 
+@app.get("/download/{sid}/diagrams.zip")
+async def download_diagrams_zip(sid: str):
+    """Download all diagram PNGs as a ZIP archive for manual Substack upload."""
+    import zipfile
+    import io
+
+    session = _sessions.get(sid)
+    if not session:
+        raise HTTPException(404, "Session not found")
+
+    diagram_dir = OUTPUTS_DIR / sid / "diagrams"
+    if not diagram_dir.exists():
+        raise HTTPException(404, "No diagrams found")
+
+    png_files = sorted(diagram_dir.glob("*.png"))
+    if not png_files:
+        raise HTTPException(404, "No diagram images found")
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for png in png_files:
+            zf.write(str(png), png.name)
+    buf.seek(0)
+
+    from starlette.responses import Response
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename=diagrams_{sid[:8]}.zip"},
+    )
+
+
+@app.get("/substack-config")
+async def substack_config():
+    """Check if Substack publishing credentials are configured."""
+    from substack_publisher import is_configured
+    return {"configured": is_configured()}
+
+
+@app.post("/publish-substack/{sid}")
+async def publish_substack(sid: str, publish: bool = False):
+    """Publish digest to Substack as draft (default) or published post.
+
+    Query params:
+        publish: bool = False  (True to publish immediately, False for draft only)
+    """
+    import asyncio
+
+    session = _sessions.get(sid)
+    if not session:
+        raise HTTPException(404, "Session not found")
+    if session["status"] != "done":
+        raise HTTPException(409, f"Not ready yet: {session['status']}")
+
+    from substack_publisher import is_configured, publish_to_substack
+
+    if not is_configured():
+        raise HTTPException(400, "Substack not configured. Set SUBSTACK_COOKIE and SUBSTACK_URL in .env")
+
+    session_dir = OUTPUTS_DIR / sid
+
+    md_path = session_dir / "summary_refined.md"
+    if not md_path.exists():
+        md_path = session_dir / "summary.md"
+    if not md_path.exists():
+        raise HTTPException(404, "Markdown file not found")
+
+    summary_md = md_path.read_text(encoding="utf-8")
+    title = session.get("title", "Research Paper")
+    diagram_dir = str(session_dir / "diagrams")
+    diagram_captions = session.get("diagram_captions", [])
+    important_tables = session.get("important_tables")
+    nb_result = session.get("notebook_result", {})
+    notebook_url = nb_result.get("hosted_url", "")
+    authors = session.get("authors", [])
+    year = session.get("year", "")
+    paper_url = session.get("paper_url", "")
+    citation_count = session.get("citation_count")
+
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(
+        None,
+        lambda: publish_to_substack(
+            summary_md=summary_md,
+            paper_title=title,
+            diagram_dir=diagram_dir,
+            diagram_captions=diagram_captions,
+            important_tables=important_tables,
+            publish=publish,
+            notebook_url=notebook_url,
+            authors=authors,
+            year=year,
+            paper_url=paper_url,
+            citation_count=citation_count,
+        ),
+    )
+
+    if result.get("status") == "error":
+        raise HTTPException(500, result.get("error", "Publishing failed"))
+
+    return result
+
+
 @app.get("/download/{sid}/{filename}")
 async def download_file(sid: str, filename: str):
     safe_name = Path(filename).name
